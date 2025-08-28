@@ -15,7 +15,7 @@ var versionCmd = &cobra.Command{
 	Short: "Show version and credits",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("moc %s\n", Version)
-		fmt.Println("Credits: Thorsten Stremetzne, People Visions & Magic LLP")
+		fmt.Println("Credits: Thorsten Stremetzne, People Visions & Magic LLP - https://github.com/PVMLLP/multi-oc")
 	},
 }
 

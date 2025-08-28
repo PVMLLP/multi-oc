@@ -42,6 +42,6 @@ Examples:
   moc cluster1 get nodes
 
 Credits:
-  Thorsten Stremetzne, People Visions & Magic LLP
+  Thorsten Stremetzne, People Visions & Magic LLP - https://github.com/PVMLLP/multi-oc
 `, rootCmd.Use))
 }

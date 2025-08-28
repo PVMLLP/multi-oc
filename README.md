@@ -96,7 +96,7 @@ moc <cluster-name> get ns -A
   - Increase TTL: `export MOC_DISCOVERY_TTL_SECONDS=300`
 
 ## Credits
-- Thorsten Stremetzne, People Visions & Magic LLP
+- Thorsten Stremetzne, People Visions & Magic LLP — https://github.com/PVMLLP/multi-oc
 
 ## License
 - TBD
