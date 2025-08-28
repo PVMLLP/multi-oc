@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"multi-oc/internal/discovery"
+
+	"github.com/spf13/cobra"
 )
 
 var lsCmd = &cobra.Command{
 	Use:   "ls",
-	Short: "Verfügbare Cluster (vom Hub) auflisten",
+	Short: "List available clusters (from the hub)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -21,7 +22,7 @@ var lsCmd = &cobra.Command{
 			return err
 		}
 		if len(clusters) == 0 {
-			fmt.Println("Keine Cluster gefunden.")
+			fmt.Println("No clusters found.")
 			return nil
 		}
 		for _, c := range clusters {

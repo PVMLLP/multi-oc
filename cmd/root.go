@@ -8,8 +8,8 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "moc",
-	Short: "multi-oc: Zentrales CLI für Multi-Cluster OpenShift",
+	Use:           "moc",
+	Short:         "multi-oc: Central CLI for multi-cluster OpenShift",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -28,16 +28,20 @@ func init() {
 	}
 
 	rootCmd.SetHelpTemplate(fmt.Sprintf(`Usage:
-  %%s [cluster|command] [args...]
+  %s [cluster|command] [args...]
 
 Commands:
-  login           Am Hub anmelden (SSO)
-  ls              Verfügbare Cluster auflisten
-  logout          Tokens löschen
+  login           Login to the hub (SSO)
+  ls              List available clusters
+  logout          Remove stored credentials
+  version         Show version and credits
 
-Beispiele:
+Examples:
   moc login --hub https://api.hub.example:6443
   moc ls
   moc cluster1 get nodes
+
+Credits:
+  Thorsten Stremetzne, People Visions & Magic LLP
 `, rootCmd.Use))
 }

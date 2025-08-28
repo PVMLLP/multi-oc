@@ -7,43 +7,43 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/spf13/cobra"
 	"multi-oc/internal/discovery"
 	"multi-oc/internal/kubeexec"
+
+	"github.com/spf13/cobra"
 )
 
 var execCmd = &cobra.Command{
 	Use:   "<cluster> [oc args...]",
-	Short: "Führe ein oc-Kommando auf einem Ziel-Cluster aus",
+	Short: "Execute an oc command against a target cluster",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		clusterName := args[0]
 		ocArgs := args[1:]
 		if len(ocArgs) == 0 {
-			return fmt.Errorf("Bitte oc-Argumente angeben, z. B.: get nodes")
+			return fmt.Errorf("Please pass oc arguments, e.g.,: get nodes")
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
-		// Ziel-Cluster API/CA ermitteln
 		cluster, err := discovery.GetCluster(ctx, clusterName)
 		if err != nil {
 			return err
 		}
 		if cluster.APIURL == "" {
-			return fmt.Errorf("API-URL für Cluster %s nicht gefunden", clusterName)
+			return fmt.Errorf("API URL for cluster %s not found", clusterName)
 		}
 
-		// Temporäre Kubeconfig erzeugen (via OAuth SSO Token für Ziel-Cluster)
-		kubeconfigPath, cleanup, err := kubeexec.BuildTempKubeconfigForCluster(ctx, cluster)
+		authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
 		if err != nil {
 			return err
 		}
 		defer cleanup()
 
-		command := exec.CommandContext(ctx, "oc", ocArgs...)
-		command.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%s", kubeconfigPath))
+		argsAll := append([]string{"--request-timeout=30s"}, authArgs...)
+		argsAll = append(argsAll, ocArgs...)
+		command := exec.CommandContext(ctx, "oc", argsAll...)
 		command.Stdout = os.Stdout
 		command.Stderr = os.Stderr
 		command.Stdin = os.Stdin
