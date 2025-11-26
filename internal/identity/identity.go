@@ -5,11 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
 
 	"multi-oc/internal/configstate"
+
+	"regexp"
 
 	keyring "github.com/zalando/go-keyring"
 )
@@ -68,11 +71,26 @@ func EnsureHubLogin(ctx context.Context) error {
 	}
 	insecure := os.Getenv("MOC_HUB_INSECURE") == "true"
 	caFile := os.Getenv("MOC_HUB_CA_FILE")
-	// Browser-Flow (token="")
-	if err := LoginHub(ctx, hubURL, insecure, caFile, ""); err != nil {
-		return err
+	useWeb := os.Getenv("MOC_HUB_USE_WEB") == "true"
+	if useWeb {
+		// Browser flow
+		return LoginHub(ctx, hubURL, insecure, caFile, "")
 	}
-	return nil
+	// Headless flow: print OAuth token URL and prompt for token, then use --token
+	hint := deriveOAuthTokenURL(hubURL)
+	if hint != "" {
+		fmt.Fprintf(os.Stderr, "Open in a browser (from any machine with access):\n  %s\nSign in there, copy the token (starting with 'sha256~') and paste it here.\n", hint)
+	} else {
+		fmt.Fprintln(os.Stderr, "OpenShift token URL could not be derived from the hub API URL. Please obtain an OAuth token from the OpenShift Web Console and paste it here (sha256~...).")
+	}
+	fmt.Fprint(os.Stderr, "Token: ")
+	stdin := bufio.NewReader(os.Stdin)
+	line, _ := stdin.ReadString('\n')
+	token := sanitizeToken(line)
+	if token == "" {
+		return fmt.Errorf("no valid token detected")
+	}
+	return LoginHub(ctx, hubURL, insecure, caFile, token)
 }
 
 func GetHubRefreshToken() (string, string, error) {
@@ -97,4 +115,50 @@ func LogoutHub() error {
 	}
 	_ = keyring.Delete(serviceHubToken, hubURL)
 	return nil
+}
+
+// sanitizeToken extracts a valid OpenShift token if present, tolerating various wrapper text.
+func sanitizeToken(s string) string {
+	s = strings.TrimSpace(s)
+	re := regexp.MustCompile(`sha256~[A-Za-z0-9\-_\.]+`)
+	if m := re.FindString(s); m != "" {
+		return m
+	}
+	if i := strings.Index(s, "="); i >= 0 {
+		cand := s[i+1:]
+		cand = strings.TrimSpace(cand)
+		cand = strings.Trim(cand, "'\"`")
+		if m := re.FindString(cand); m != "" {
+			return m
+		}
+		s = cand
+	}
+	s = strings.Trim(s, "'\"`")
+	if re.MatchString(s) {
+		return s
+	}
+	return s
+}
+
+// deriveOAuthTokenURL derives the OAuth token display URL from an OpenShift API URL.
+// Supports api.<base> and api-int.<base> patterns.
+func deriveOAuthTokenURL(api string) string {
+	u, err := url.Parse(api)
+	if err != nil {
+		return ""
+	}
+	host := u.Hostname()
+	if host == "" {
+		return ""
+	}
+	var withoutAPI string
+	switch {
+	case strings.HasPrefix(host, "api."):
+		withoutAPI = strings.TrimPrefix(host, "api.")
+	case strings.HasPrefix(host, "api-int."):
+		withoutAPI = strings.TrimPrefix(host, "api-int.")
+	default:
+		return ""
+	}
+	return "https://oauth-openshift.apps." + withoutAPI + "/oauth/token/display"
 }
