@@ -14,18 +14,18 @@ import (
 	"multi-oc/internal/keystore"
 )
 
-// BuildOcAuthArgs erzeugt die Auth-Argumente für "oc" (ohne Kubeconfig):
-// --server, --token, optional --certificate-authority oder --insecure-skip-tls-verify.
-// Sie nutzt: Env (MOC_TARGET_TOKEN/CA_FILE/INSECURE) -> Keyring -> interaktiven Prompt.
-// Gibt zusätzlich eine Cleanup-Funktion zurück (löscht temporäre CA-Datei falls angelegt).
+// BuildOcAuthArgs builds authentication args for "oc" (without kubeconfig):
+// --server, --token, and optionally --certificate-authority or --insecure-skip-tls-verify.
+// Sources: Env (MOC_TARGET_TOKEN/CA_FILE/INSECURE) -> Keyring -> interactive prompt.
+// Returns a cleanup function (removes temporary CA file if created).
 func BuildOcAuthArgs(ctx context.Context, c discovery.Cluster) ([]string, func(), error) {
 	_ = ctx
 	if c.APIURL == "" {
-		return nil, nil, fmt.Errorf("APIURL leer")
+		return nil, nil, fmt.Errorf("APIURL empty")
 	}
 	cleanup := func() {}
 
-	// 1) Token aus Env -> Keyring -> Prompt
+	// 1) Token from env -> Keyring -> prompt
 	token := sanitizeToken(os.Getenv("MOC_TARGET_TOKEN"))
 	if token == "" {
 		if t, err := keystore.GetTargetToken(c.Name); err == nil && t != "" {
@@ -33,24 +33,24 @@ func BuildOcAuthArgs(ctx context.Context, c discovery.Cluster) ([]string, func()
 		}
 	}
 	if token == "" {
-		// Hinweis-URL für Token-Beschaffung
+		// Hint URL for token retrieval
 		hint := deriveOAuthTokenURL(c.APIURL)
 		if hint != "" {
-			fmt.Fprintf(os.Stderr, "Kein Token gefunden. Öffne im Browser (auf einem beliebigen Rechner mit Zugriff):\n  %s\nMelde dich dort an, kopiere das Token (beginnend mit 'sha256~') und füge es hier ein.\n", hint)
+			fmt.Fprintf(os.Stderr, "No token found. Open in a browser (from any machine with access):\n  %s\nSign in there, copy the token (starting with 'sha256~') and paste it here.\n", hint)
 		} else {
-			fmt.Fprintln(os.Stderr, "Kein Token gefunden. Bitte besorge dir aus der OpenShift Web Console dein 'oc login --token' und füge es hier ein (sha256~...).")
+			fmt.Fprintln(os.Stderr, "No token found. Please get your 'oc login --token' from the OpenShift Web Console and paste it here (sha256~...).")
 		}
 		fmt.Fprint(os.Stderr, "Token: ")
 		stdin := bufio.NewReader(os.Stdin)
 		line, _ := stdin.ReadString('\n')
 		token = sanitizeToken(line)
 		if token == "" {
-			return nil, nil, fmt.Errorf("kein gültiges Token erkannt")
+			return nil, nil, fmt.Errorf("no valid token detected")
 		}
 		_ = keystore.SetTargetToken(c.Name, token)
 	}
 
-	// 2) TLS-Flags bestimmen
+	// 2) Determine TLS flags
 	insecure := os.Getenv("MOC_TARGET_INSECURE") == "true"
 	caFile := os.Getenv("MOC_TARGET_CA_FILE")
 
@@ -59,7 +59,7 @@ func BuildOcAuthArgs(ctx context.Context, c discovery.Cluster) ([]string, func()
 	if caFile != "" {
 		args = append(args, "--certificate-authority", caFile)
 	} else if len(c.CAData) > 0 {
-		// Schreibe CA in temporäre Datei
+		// Write CA to a temporary file
 		tmpDir, err := os.MkdirTemp("", "moc-ca-*")
 		if err != nil {
 			return nil, nil, err
@@ -100,7 +100,7 @@ func sanitizeToken(s string) string {
 	return s
 }
 
-// deriveOAuthTokenURL versucht aus der API-URL die OAuth-Token-Request-URL abzuleiten.
+// deriveOAuthTokenURL derives the OAuth token request URL from the API URL.
 func deriveOAuthTokenURL(api string) string {
 	u, err := url.Parse(api)
 	if err != nil {
@@ -110,9 +110,14 @@ func deriveOAuthTokenURL(api string) string {
 	if host == "" {
 		return ""
 	}
-	withoutAPI := strings.TrimPrefix(host, "api.")
-	if withoutAPI == host {
+	var withoutAPI string
+	switch {
+	case strings.HasPrefix(host, "api."):
+		withoutAPI = strings.TrimPrefix(host, "api.")
+	case strings.HasPrefix(host, "api-int."):
+		withoutAPI = strings.TrimPrefix(host, "api-int.")
+	default:
 		return ""
 	}
-	return "https://oauth-openshift.apps." + withoutAPI + "/oauth/token/request"
+	return "https://oauth-openshift.apps." + withoutAPI + "/oauth/token/display"
 }

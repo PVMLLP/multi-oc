@@ -42,12 +42,12 @@ func LoginHub(ctx context.Context, hubURL string, insecure bool, caFile string, 
 	return cmd.Run()
 }
 
-// EnsureHubLogin stellt sicher, dass eine gültige oc-Session zum Hub besteht.
-// Falls keine Hub-URL konfiguriert ist, wird sie interaktiv abgefragt und gespeichert.
-// Es wird standardmäßig der Browser-Flow genutzt (--web). Optional kann das Verhalten
-// über Umgebungsvariablen beeinflusst werden:
-//   MOC_HUB_INSECURE=true    → --insecure-skip-tls-verify
-//   MOC_HUB_CA_FILE=/path    → --certificate-authority
+// EnsureHubLogin ensures there is a valid oc session to the hub.
+// If no hub URL is configured, it prompts for it and saves it.
+// It uses the browser flow by default (--web). Behavior can be influenced via env:
+//
+//	MOC_HUB_INSECURE=true    → --insecure-skip-tls-verify
+//	MOC_HUB_CA_FILE=/path    → --certificate-authority
 func EnsureHubLogin(ctx context.Context) error {
 	hubURL, err := configstate.LoadHub()
 	if err != nil {
@@ -55,12 +55,12 @@ func EnsureHubLogin(ctx context.Context) error {
 	}
 	if strings.TrimSpace(hubURL) == "" {
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Fprint(os.Stderr, "Hub API URL (z. B. https://api.hub.example:6443): ")
+		fmt.Fprint(os.Stderr, "Hub API URL (e.g., https://api.hub.example:6443): ")
 		line, _ := reader.ReadString('\n')
 		hubURL = strings.TrimSpace(line)
 		hubURL = strings.TrimPrefix(hubURL, "@")
 		if hubURL == "" {
-			return fmt.Errorf("Hub API URL erforderlich")
+			return fmt.Errorf("hub API URL is required")
 		}
 		if err := configstate.SaveHub(hubURL); err != nil {
 			return err

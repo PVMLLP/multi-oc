@@ -25,7 +25,7 @@ var execCmd = &cobra.Command{
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
 			_ = identity.EnsureHubLogin(ctx)
-			return fmt.Errorf("Bitte oc-Argumente angeben, z. B.: get nodes")
+			return fmt.Errorf("Please pass oc arguments, e.g.,: get nodes")
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)

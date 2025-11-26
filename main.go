@@ -24,11 +24,11 @@ func main() {
 			clusterName := first
 			ocArgs := os.Args[2:]
 			if len(ocArgs) == 0 {
-				// Vor dem Abbruch sicherstellen, dass der Hub-Login vorhanden ist
+				// Ensure hub login before returning an error
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 				defer cancel()
 				_ = identity.EnsureHubLogin(ctx)
-				log.Fatalf("Bitte oc-Argumente angeben, z. B.: get nodes")
+				log.Fatalf("Please pass oc arguments, e.g.,: get nodes")
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -39,7 +39,7 @@ func main() {
 				log.Fatal(err)
 			}
 			if cluster.APIURL == "" {
-				log.Fatalf("API-URL für Cluster %s nicht gefunden", clusterName)
+				log.Fatalf("API URL for cluster %s not found", clusterName)
 			}
 
 			authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
