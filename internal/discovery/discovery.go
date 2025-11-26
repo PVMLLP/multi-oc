@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"multi-oc/internal/identity"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -93,7 +95,23 @@ func ListManagedClusters(ctx context.Context) ([]Cluster, error) {
 	cmd := exec.CommandContext(ctx, "oc", "get", "managedclusters.cluster.open-cluster-management.io", "-o", "json")
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("oc get managedclusters: %w", err)
+		// Erster Versuch fehlgeschlagen → Login sicherstellen und einmalig erneut versuchen
+		// Nur bei typischen Auth-/Kontextfehlern sinnvoll; wir versuchen generell einmal.
+		if loginErr := identity.EnsureHubLogin(ctx); loginErr != nil {
+			// Rückgabe einer freundlicheren Fehlermeldung
+			var ee *exec.ExitError
+			if errors.As(err, &ee) {
+				return nil, fmt.Errorf("Hub-Verbindung erforderlich (Login fehlgeschlagen): %w", loginErr)
+			}
+			return nil, fmt.Errorf("Hub-Verbindung erforderlich (oc nicht ausführbar?): %w", loginErr)
+		}
+		// Retry
+		cmd2 := exec.CommandContext(ctx, "oc", "get", "managedclusters.cluster.open-cluster-management.io", "-o", "json")
+		out2, err2 := cmd2.Output()
+		if err2 != nil {
+			return nil, fmt.Errorf("oc get managedclusters nach Login fehlgeschlagen: %w", err2)
+		}
+		out = out2
 	}
 	var mcl managedClusterList
 	if err := json.Unmarshal(out, &mcl); err != nil {

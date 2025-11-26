@@ -9,6 +9,7 @@ import (
 
 	"multi-oc/cmd"
 	"multi-oc/internal/discovery"
+	"multi-oc/internal/identity"
 	"multi-oc/internal/kubeexec"
 )
 
@@ -23,6 +24,10 @@ func main() {
 			clusterName := first
 			ocArgs := os.Args[2:]
 			if len(ocArgs) == 0 {
+				// Vor dem Abbruch sicherstellen, dass der Hub-Login vorhanden ist
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				defer cancel()
+				_ = identity.EnsureHubLogin(ctx)
 				log.Fatalf("Bitte oc-Argumente angeben, z. B.: get nodes")
 			}
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"multi-oc/internal/discovery"
+	"multi-oc/internal/identity"
 	"multi-oc/internal/kubeexec"
 
 	"github.com/spf13/cobra"
@@ -21,7 +22,10 @@ var execCmd = &cobra.Command{
 		clusterName := args[0]
 		ocArgs := args[1:]
 		if len(ocArgs) == 0 {
-			return fmt.Errorf("Please pass oc arguments, e.g.,: get nodes")
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			_ = identity.EnsureHubLogin(ctx)
+			return fmt.Errorf("Bitte oc-Argumente angeben, z. B.: get nodes")
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
