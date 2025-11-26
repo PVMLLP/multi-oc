@@ -119,5 +119,5 @@ func deriveOAuthTokenURL(api string) string {
 	default:
 		return ""
 	}
-	return "https://oauth-openshift.apps." + withoutAPI + "/oauth/token/display"
+	return "https://oauth-openshift.apps." + withoutAPI + "/oauth/token/request"
 }

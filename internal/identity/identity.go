@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"multi-oc/internal/configstate"
-
 	"regexp"
 
 	keyring "github.com/zalando/go-keyring"
@@ -21,18 +20,16 @@ const (
 	serviceHubToken = "multi-oc-hub-refresh-token"
 )
 
-// LoginHub runs an oc login.
-// If token != "", it performs a headless login via --token; otherwise it uses the browser flow (--web).
+// LoginHub runs an oc login using a token.
 func LoginHub(ctx context.Context, hubURL string, insecure bool, caFile string, token string) error {
 	if hubURL == "" {
 		return fmt.Errorf("hubURL is empty")
 	}
 	args := []string{"login", "--server", hubURL}
-	if token != "" {
-		args = append(args, "--token", token)
-	} else {
-		args = append(args, "--web")
+	if token == "" {
+		return fmt.Errorf("token is required for hub login")
 	}
+	args = append(args, "--token", token)
 	if insecure {
 		args = append(args, "--insecure-skip-tls-verify=true")
 	}
@@ -47,7 +44,7 @@ func LoginHub(ctx context.Context, hubURL string, insecure bool, caFile string, 
 
 // EnsureHubLogin ensures there is a valid oc session to the hub.
 // If no hub URL is configured, it prompts for it and saves it.
-// It uses the browser flow by default (--web). Behavior can be influenced via env:
+// It uses a headless flow: prints an OAuth URL to obtain a token and prompts for it.
 //
 //	MOC_HUB_INSECURE=true    → --insecure-skip-tls-verify
 //	MOC_HUB_CA_FILE=/path    → --certificate-authority
@@ -71,11 +68,6 @@ func EnsureHubLogin(ctx context.Context) error {
 	}
 	insecure := os.Getenv("MOC_HUB_INSECURE") == "true"
 	caFile := os.Getenv("MOC_HUB_CA_FILE")
-	useWeb := os.Getenv("MOC_HUB_USE_WEB") == "true"
-	if useWeb {
-		// Browser flow
-		return LoginHub(ctx, hubURL, insecure, caFile, "")
-	}
 	// Headless flow: print OAuth token URL and prompt for token, then use --token
 	hint := deriveOAuthTokenURL(hubURL)
 	if hint != "" {
@@ -140,7 +132,7 @@ func sanitizeToken(s string) string {
 	return s
 }
 
-// deriveOAuthTokenURL derives the OAuth token display URL from an OpenShift API URL.
+// deriveOAuthTokenURL derives the OAuth token request URL from an OpenShift API URL.
 // Supports api.<base> and api-int.<base> patterns.
 func deriveOAuthTokenURL(api string) string {
 	u, err := url.Parse(api)
@@ -160,5 +152,5 @@ func deriveOAuthTokenURL(api string) string {
 	default:
 		return ""
 	}
-	return "https://oauth-openshift.apps." + withoutAPI + "/oauth/token/display"
+	return "https://oauth-openshift.apps." + withoutAPI + "/oauth/token/request"
 }
