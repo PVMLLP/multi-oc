@@ -67,6 +67,19 @@ func tokenFilePath(clusterName string) (string, error) {
 	return filepath.Join(toks, fmt.Sprintf("%s.token", clusterName)), nil
 }
 
+// KubeconfigPath returns the default path where a per-cluster kubeconfig
+// can be placed for moc to pick up automatically.
+// Example: ~/.config/multi-oc/kubeconfigs/<cluster>.kubeconfig
+func KubeconfigPath(clusterName string) (string, error) {
+	dir, err := configDir()
+	if err != nil {
+		return "", err
+	}
+	kcs := filepath.Join(dir, "kubeconfigs")
+	// No mkdir here; reading may not require directory to exist
+	return filepath.Join(kcs, fmt.Sprintf("%s.kubeconfig", clusterName)), nil
+}
+
 func writeTokenToFile(clusterName, token string) error {
 	path, err := tokenFilePath(clusterName)
 	if err != nil {

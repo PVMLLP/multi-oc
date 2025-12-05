@@ -10,6 +10,7 @@ import (
 	"multi-oc/cmd"
 	"multi-oc/internal/discovery"
 	"multi-oc/internal/identity"
+	"multi-oc/internal/keystore"
 	"multi-oc/internal/kubeexec"
 )
 
@@ -42,20 +43,30 @@ func main() {
 				log.Fatalf("API URL for cluster %s not found", clusterName)
 			}
 
-			authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer cleanup()
+			// Attempt oc call, on first auth failure delete stored token and retry once
+			for attempt := 0; attempt < 2; attempt++ {
+				authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer cleanup()
 
-			args := append([]string{"--request-timeout=30s"}, authArgs...)
-			args = append(args, ocArgs...)
-			command := exec.CommandContext(ctx, "oc", args...)
-			command.Stdout = os.Stdout
-			command.Stderr = os.Stderr
-			command.Stdin = os.Stdin
-			if err := command.Run(); err != nil {
-				log.Fatal(err)
+				args := append([]string{"--request-timeout=30s"}, authArgs...)
+				args = append(args, ocArgs...)
+				command := exec.CommandContext(ctx, "oc", args...)
+				command.Stdout = os.Stdout
+				command.Stderr = os.Stderr
+				command.Stdin = os.Stdin
+				if err := command.Run(); err != nil {
+					// On first failure, drop cached token and retry
+					if attempt == 0 {
+						_ = keystore.DeleteTargetToken(cluster.Name)
+						_, _ = os.Stderr.WriteString("Authentication failed. Please provide a fresh token when prompted.\n")
+						continue
+					}
+					log.Fatal(err)
+				}
+				break
 			}
 			return
 		}

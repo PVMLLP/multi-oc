@@ -25,6 +25,11 @@ func BuildOcAuthArgs(ctx context.Context, c discovery.Cluster) ([]string, func()
 	}
 	cleanup := func() {}
 
+	// 0) Prefer existing kubeconfig (env or per-cluster path)
+	if p := findKubeconfigForCluster(c.Name); p != "" {
+		return []string{"--kubeconfig", p}, cleanup, nil
+	}
+
 	// 1) Token from env -> Keyring -> prompt
 	token := sanitizeToken(os.Getenv("MOC_TARGET_TOKEN"))
 	if token == "" {
@@ -76,6 +81,24 @@ func BuildOcAuthArgs(ctx context.Context, c discovery.Cluster) ([]string, func()
 	}
 
 	return args, cleanup, nil
+}
+
+// findKubeconfigForCluster returns a kubeconfig file to use for the given cluster
+// by checking the MOC_TARGET_KUBECONFIG env var and a conventional per-cluster path.
+func findKubeconfigForCluster(clusterName string) string {
+	// explicit override
+	if env := strings.TrimSpace(os.Getenv("MOC_TARGET_KUBECONFIG")); env != "" {
+		if st, err := os.Stat(env); err == nil && !st.IsDir() {
+			return env
+		}
+	}
+	// default location ~/.config/multi-oc/kubeconfigs/<cluster>.kubeconfig
+	if def, err := keystore.KubeconfigPath(clusterName); err == nil {
+		if st, err := os.Stat(def); err == nil && !st.IsDir() {
+			return def
+		}
+	}
+	return ""
 }
 
 func sanitizeToken(s string) string {

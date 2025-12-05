@@ -24,8 +24,8 @@ var (
 
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Login to the hub via browser SSO or headless with token",
-	Long:  "If flags are omitted, you will be prompted for the hub API URL and optionally a token (for headless environments).",
+	Short: "Login to the hub (headless token flow)",
+	Long:  "You will be prompted for the hub API URL (if not provided). A copyable OAuth URL is printed for token retrieval; paste the token to complete the login.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		reader := bufio.NewReader(os.Stdin)
 
@@ -41,20 +41,22 @@ var loginCmd = &cobra.Command{
 			return fmt.Errorf("hub API URL is required")
 		}
 
-		// Decide flow: if --headless or no token but headless desired → prompt token
-		if headless && token == "" {
-			fmt.Fprint(os.Stderr, "Hub OAuth token (sha256~..., leave empty to use browser flow): ")
-			line, _ := reader.ReadString('\n')
-			token = strings.TrimSpace(line)
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
-		if err := identity.LoginHub(ctx, hubURL, insecure, caFile, token); err != nil {
+		// Persist hub URL first
+		if err := configstate.SaveHub(hubURL); err != nil {
 			return err
 		}
-		return configstate.SaveHub(hubURL)
+		// Bridge flags to env used by EnsureHubLogin
+		if insecure {
+			_ = os.Setenv("MOC_HUB_INSECURE", "true")
+		}
+		if caFile != "" {
+			_ = os.Setenv("MOC_HUB_CA_FILE", caFile)
+		}
+		// Always use headless EnsureHubLogin (prints OAuth URL and prompts for token)
+		return identity.EnsureHubLogin(ctx)
 	},
 }
 
@@ -63,6 +65,7 @@ func init() {
 	loginCmd.Flags().StringVar(&hubURL, "hub", "", "API URL of the hub cluster (https://api.hub:6443)")
 	loginCmd.Flags().BoolVar(&insecure, "insecure", false, "Skip TLS verification for the hub")
 	loginCmd.Flags().StringVar(&caFile, "ca-file", "", "Path to a CA file for the hub")
-	loginCmd.Flags().BoolVar(&headless, "headless", false, "Headless login (prompt for token if --token not provided)")
-	loginCmd.Flags().StringVar(&token, "token", "", "OAuth token for the hub (used with --headless)")
+	// Deprecated flags (kept for compatibility, no effect in headless flow):
+	loginCmd.Flags().BoolVar(&headless, "headless", false, "Deprecated (no-op): login is headless by default")
+	loginCmd.Flags().StringVar(&token, "token", "", "Deprecated (no-op): token will be prompted interactively")
 }

@@ -9,6 +9,7 @@ import (
 
 	"multi-oc/internal/discovery"
 	"multi-oc/internal/identity"
+	"multi-oc/internal/keystore"
 	"multi-oc/internal/kubeexec"
 
 	"github.com/spf13/cobra"
@@ -39,19 +40,31 @@ var execCmd = &cobra.Command{
 			return fmt.Errorf("API URL for cluster %s not found", clusterName)
 		}
 
-		authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
-		if err != nil {
-			return err
-		}
-		defer cleanup()
+		// Attempt oc call, on first auth failure delete stored token and retry once
+		for attempt := 0; attempt < 2; attempt++ {
+			authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
+			if err != nil {
+				return err
+			}
+			defer cleanup()
 
-		argsAll := append([]string{"--request-timeout=30s"}, authArgs...)
-		argsAll = append(argsAll, ocArgs...)
-		command := exec.CommandContext(ctx, "oc", argsAll...)
-		command.Stdout = os.Stdout
-		command.Stderr = os.Stderr
-		command.Stdin = os.Stdin
-		return command.Run()
+			argsAll := append([]string{"--request-timeout=30s"}, authArgs...)
+			argsAll = append(argsAll, ocArgs...)
+			command := exec.CommandContext(ctx, "oc", argsAll...)
+			command.Stdout = os.Stdout
+			command.Stderr = os.Stderr
+			command.Stdin = os.Stdin
+			if err := command.Run(); err != nil {
+				if attempt == 0 {
+					_ = keystore.DeleteTargetToken(cluster.Name)
+					_, _ = os.Stderr.WriteString("Authentication failed. Please provide a fresh token when prompted.\n")
+					continue
+				}
+				return err
+			}
+			return nil
+		}
+		return nil
 	},
 }
 
