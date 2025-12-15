@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"multi-oc/internal/discovery"
+	"multi-oc/internal/hubkubeconfig"
 	"multi-oc/internal/keystore"
 )
 
@@ -28,6 +29,12 @@ func BuildOcAuthArgs(ctx context.Context, c discovery.Cluster) ([]string, func()
 	// 0) Prefer existing kubeconfig (env or per-cluster path)
 	if p := findKubeconfigForCluster(c.Name); p != "" {
 		return []string{"--kubeconfig", p}, cleanup, nil
+	}
+	// 0b) Try fetching kubeconfig on-demand from hub (admin-kubeconfig secret)
+	if ok, _ := hubkubeconfig.WriteClusterKubeconfig(ctx, c, hubkubeconfig.Options{}); ok {
+		if p := findKubeconfigForCluster(c.Name); p != "" {
+			return []string{"--kubeconfig", p}, cleanup, nil
+		}
 	}
 
 	// 1) Token from env -> Keyring -> prompt

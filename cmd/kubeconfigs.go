@@ -16,7 +16,12 @@ var kubeconfigsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
-		n, err := hubkubeconfig.WriteAllKubeconfigs(ctx)
+		opts := hubkubeconfig.Options{
+			Force:   kubeconfigsForce,
+			Verbose: kubeconfigsVerbose,
+			MSAName: kubeconfigsMSAName,
+		}
+		n, err := hubkubeconfig.WriteAllKubeconfigs(ctx, opts)
 		if err != nil {
 			return err
 		}
@@ -25,8 +30,17 @@ var kubeconfigsCmd = &cobra.Command{
 	},
 }
 
+var (
+	kubeconfigsForce   bool
+	kubeconfigsVerbose bool
+	kubeconfigsMSAName string
+)
+
 func init() {
 	rootCmd.AddCommand(kubeconfigsCmd)
+	kubeconfigsCmd.Flags().BoolVar(&kubeconfigsForce, "force", false, "Overwrite existing kubeconfigs")
+	kubeconfigsCmd.Flags().BoolVar(&kubeconfigsVerbose, "verbose", false, "Verbose output")
+	kubeconfigsCmd.Flags().StringVar(&kubeconfigsMSAName, "msa-name", "moc", "ManagedServiceAccount name to use (if available)")
 }
 
 

@@ -29,7 +29,7 @@ func LoginHub(ctx context.Context, hubURL string, insecure bool, caFile string, 
 	if token == "" {
 		return fmt.Errorf("token is required for hub login")
 	}
-	args = append(args, "--token", token)
+		args = append(args, "--token", token)
 	if insecure {
 		args = append(args, "--insecure-skip-tls-verify=true")
 	}
@@ -64,6 +64,12 @@ func EnsureHubLogin(ctx context.Context) error {
 		}
 		if err := configstate.SaveHub(hubURL); err != nil {
 			return err
+		}
+	}
+	// Fast path: if already logged in to this hub, skip prompting
+	if cur, curErr := exec.CommandContext(ctx, "oc", "whoami", "--show-server").Output(); curErr == nil {
+		if strings.TrimSpace(string(cur)) == strings.TrimSpace(hubURL) {
+			return nil
 		}
 	}
 	insecure := os.Getenv("MOC_HUB_INSECURE") == "true"

@@ -19,7 +19,7 @@ func main() {
 	if len(os.Args) > 1 {
 		first := os.Args[1]
 		switch first {
-		case "login", "ls", "logout", "help", "completion", "version":
+		case "login", "ls", "logout", "help", "completion", "version", "kubeconfigs":
 			// cobra ausführen
 		default:
 			clusterName := first
@@ -45,26 +45,26 @@ func main() {
 
 			// Attempt oc call, on first auth failure delete stored token and retry once
 			for attempt := 0; attempt < 2; attempt++ {
-				authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer cleanup()
+			authArgs, cleanup, err := kubeexec.BuildOcAuthArgs(ctx, cluster)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer cleanup()
 
-				args := append([]string{"--request-timeout=30s"}, authArgs...)
-				args = append(args, ocArgs...)
-				command := exec.CommandContext(ctx, "oc", args...)
-				command.Stdout = os.Stdout
-				command.Stderr = os.Stderr
-				command.Stdin = os.Stdin
-				if err := command.Run(); err != nil {
+			args := append([]string{"--request-timeout=30s"}, authArgs...)
+			args = append(args, ocArgs...)
+			command := exec.CommandContext(ctx, "oc", args...)
+			command.Stdout = os.Stdout
+			command.Stderr = os.Stderr
+			command.Stdin = os.Stdin
+			if err := command.Run(); err != nil {
 					// On first failure, drop cached token and retry
 					if attempt == 0 {
 						_ = keystore.DeleteTargetToken(cluster.Name)
 						_, _ = os.Stderr.WriteString("Authentication failed. Please provide a fresh token when prompted.\n")
 						continue
 					}
-					log.Fatal(err)
+				log.Fatal(err)
 				}
 				break
 			}
